@@ -24,14 +24,14 @@ JENKINS_USERNAME = os.getenv('JENKINS_USERNAME')
 JENKINS_TOKEN = os.getenv('JENKINS_TOKEN')
 TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL')
 LOGS_FILENAME = os.getenv('LOGS_FILENAME')
-JOB_POLL_FREQUENCY_SECONDS = int(os.getenv('JOB_POLL_FREQUENCY_SECONDS'))
-MAX_ABORTED_JOBS = int(os.getenv('MAX_ABORTED_JOBS'))
-MAX_IN_PROGRESS_JOB_DURATION_SECONDS = int(os.getenv('MAX_IN_PROGRESS_JOB_DURATION_SECONDS'))
-MAX_ABORTED_JOB_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_JOB_DURATION_SECONDS'))
-MAX_IN_PROGRESS_JOBS = int(os.getenv('MAX_IN_PROGRESS_JOBS'))
+BUILD_POLL_FREQUENCY_SECONDS = int(os.getenv('BUILD_POLL_FREQUENCY_SECONDS'))
+MAX_ABORTED_BUILDS = int(os.getenv('MAX_ABORTED_BUILDS'))
+MAX_IN_PROGRESS_BUILD_DURATION_SECONDS = int(os.getenv('MAX_IN_PROGRESS_BUILD_DURATION_SECONDS'))
+MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_SECONDS'))
+MAX_IN_PROGRESS_BUILDS = int(os.getenv('MAX_IN_PROGRESS_BUILDS'))
 PIPELINE_POLL_FREQUENCY_SECONDS = int(os.getenv('PIPELINE_POLL_FREQUENCY_SECONDS'))
-MAX_FAILED_ATTEMPTS_JOB = int(os.getenv('MAX_FAILED_ATTEMPTS_JOB'))
-MAX_FAILED_JOBS = int(os.getenv('MAX_FAILED_JOBS'))
+MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS'))
+MAX_FAILED_BUILDS = int(os.getenv('MAX_FAILED_BUILDS'))
 # Encode the API token in base64
 AUTH_STR = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8")
 
@@ -113,99 +113,119 @@ def get_build_relative_time(build: any) -> float:
     """
     return datetime.datetime.now().timestamp() - build['timestamp']/1000
 
-async def check_jobs() -> None:
+def build_is_today(build: any) -> bool:
     """
-    Polls the Jenkins API for job status and sends notifications for failed, long-running, or timed out jobs.
+    Check if the build timestamp corresponds to today's date. The build timestamp is converted from milliseconds 
+    to seconds by dividing by 1000.
 
-    The function enters an infinite loop and repeatedly fetches job data from the Jenkins API using the get_jenkins_data()
-    function. For each job in the list of builds, the function checks if the job ID is in the ids_ignore list. If not,
-    the function calculates the relative time since the job started using the get_build_relative_time() function. Depending
-    on the job status and duration, the function sends a notification via the notify() function with details of the job and
+    Args:
+        build: A dictionary representing a Jenkins build, containing a 'timestamp' key with a value in milliseconds.
+
+    Returns:
+        True if the build timestamp corresponds to today's date, False otherwise.
+    """
+    # Convert epoch time to datetime object in local timezone
+    dt = datetime.datetime.fromtimestamp(build['timestamp']/1000)
+
+    # Get today's date in local timezone
+    today = datetime.datetime.today().date()
+
+    # Check if the date of the datetime object is equal to today's date
+    return dt.date() == today
+
+async def check_builds() -> None:
+    """
+    Polls the Jenkins API for build status and sends notifications for failed, long-running, or timed out builds.
+
+    The function enters an infinite loop and repeatedly fetches build data from the Jenkins API using the get_jenkins_data()
+    function. For each build in the list of builds, the function checks if the build ID is in the ids_ignore list. If not,
+    the function calculates the relative time since the build started using the get_build_relative_time() function. Depending
+    on the build status and duration, the function sends a notification via the notify() function with details of the build and
     its status.
 
-    The function sleeps for a fixed interval of JOB_POLL_FREQUENCY_SECONDS between each API request.
+    The function sleeps for a fixed interval of BUILD_POLL_FREQUENCY_SECONDS between each API request.
     The function runs indefinitely until it is stopped externally.
     """
     display_names_failed = []
     ids_ignore = []        
     while True:
-        logging.info("Checking jobs")
+        logging.info("Checking builds")
         builds = get_jenkins_data()['builds']
         for build in builds:
             if build['id'] not in ids_ignore:
 
-                job_relative_time = get_build_relative_time(build)
+                build_relative_time = get_build_relative_time(build)
 
-                if build['result'] == "FAILURE":
+                if build['result'] == "FAILURE" and build_is_today(build):
                     display_names_failed.append(build['fullDisplayName'])
                     ids_ignore.append(build['id'])
                     build_failed_count = display_names_failed.count(build['fullDisplayName'])
 
-                    if build_failed_count >= MAX_FAILED_ATTEMPTS_JOB:
-                        notify('Job failed multiple times',
-                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.")
+                    if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS:
+                        notify('Build failed multiple times',
+                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times today.")
 
-                elif job_relative_time >= MAX_IN_PROGRESS_JOB_DURATION_SECONDS and bool(build['building']):
+                elif build_relative_time >= MAX_IN_PROGRESS_BUILD_DURATION_SECONDS and bool(build['building']):
                     ids_ignore.append(build['id'])
-                    notify('Job still in progress',
-                        build['fullDisplayName'] + " has been building for the last " + str(round(float(job_relative_time/3600))) + " hours.")
+                    notify('Build still in progress',
+                        build['fullDisplayName'] + " has been building for the last " + str(round(float(build_relative_time/3600))) + " hours.")
 
-                elif build['duration']/1000 >= MAX_ABORTED_JOB_DURATION_SECONDS and build['result'] == "ABORTED":
+                elif build['duration']/1000 >= MAX_ABORTED_BUILD_DURATION_SECONDS and build['result'] == "ABORTED" and build_is_today(build):
                     ids_ignore.append(build['id'])
-                    notify('Job has timed out',
+                    notify('Build has timed out',
                         build['fullDisplayName'] + " aborted after " + str(round(float(build['duration']/3.6e+6),2)) + " hours.")                                      
 
-        await asyncio.sleep(JOB_POLL_FREQUENCY_SECONDS)
+        await asyncio.sleep(BUILD_POLL_FREQUENCY_SECONDS)
         
 async def check_pipeline() -> None:
     """
-    Polls the Jenkins API for pipeline job status and sends notifications for aborted, failed, or long-running jobs.
+    Polls the Jenkins API for pipeline build status and sends notifications for aborted, failed, or long-running builds.
 
-    The function enters an infinite loop and repeatedly fetches job data from the Jenkins API using the get_jenkins_data()
-    function. For each job in the list of builds, the function checks if the job has been running for less than or equal to
-    PIPELINE_POLL_FREQUENCY_SECONDS. If so, the function checks the job result and building status and increments counters
-    for aborted, failed, and in-progress jobs. After processing all jobs, the function checks if any of the counters exceed
-    their respective MAX_*_JOBS thresholds. If so, the function sends a notification via the notify() function with details
-    of the jobs and their status.
+    The function enters an infinite loop and repeatedly fetches build data from the Jenkins API using the get_jenkins_data()
+    function. For each build in the list of builds, the function checks if the build has been running for less than or equal to
+    PIPELINE_POLL_FREQUENCY_SECONDS. If so, the function checks the build result and building status and increments counters
+    for aborted, failed, and in-progress builds. After processing all builds, the function checks if any of the counters exceed
+    their respective MAX_*_BUILDS thresholds. If so, the function sends a notification via the notify() function with details
+    of the builds and their status.
 
     The function sleeps for a fixed interval of PIPELINE_POLL_FREQUENCY_SECONDS between each API request. 
     The function runs indefinitely until it is stopped externally.
     """    
     while True:
         logging.info("Checking pipeline")
-        count_aborted_jobs = 0
-        count_failed_jobs = 0
-        count_in_progress_jobs = 0
+        count_aborted_builds = 0
+        count_failed_builds = 0
+        count_in_progress_builds = 0
         builds = get_jenkins_data()['builds']
 
         for build in builds:
-            job_relative_time = get_build_relative_time(build)
-            if job_relative_time <= PIPELINE_POLL_FREQUENCY_SECONDS:
+            build_relative_time = get_build_relative_time(build)
+            if build_relative_time <= PIPELINE_POLL_FREQUENCY_SECONDS:
                 if build['result'] == "ABORTED":
-                    count_aborted_jobs += 1
+                    count_aborted_builds += 1
                 elif build['result'] == "FAILURE":
-                    count_failed_jobs += 1
+                    count_failed_builds += 1
                 elif bool(build['building']):
-                    count_in_progress_jobs += 1          
+                    count_in_progress_builds += 1          
 
-        if count_aborted_jobs >= MAX_ABORTED_JOBS:
-            notify('Several jobs aborted',
-                str(count_aborted_jobs) + " job(s) aborted within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
+        if count_aborted_builds >= MAX_ABORTED_BUILDS:
+            notify('Several builds aborted',
+                str(count_aborted_builds) + " builds aborted within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
             
-        if count_failed_jobs >= MAX_FAILED_JOBS:
-            notify('Several jobs failed',
-                str(count_failed_jobs) + " job(s) failed within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
+        if count_failed_builds >= MAX_FAILED_BUILDS:
+            notify('Several builds failed',
+                str(count_failed_builds) + " builds failed within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
             
-        if count_in_progress_jobs >= MAX_IN_PROGRESS_JOBS:
-            notify('Several jobs building',
-                str(count_in_progress_jobs) + " executed within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
+        if count_in_progress_builds >= MAX_IN_PROGRESS_BUILDS:
+            notify('Several builds building',
+                str(count_in_progress_builds) + " builds executed within the last " + str(round(float(PIPELINE_POLL_FREQUENCY_SECONDS/3600))) + " hours.")
         
         await asyncio.sleep(PIPELINE_POLL_FREQUENCY_SECONDS)
 
 ## Main program runs here
 def main():
     loop = asyncio.get_event_loop()
-    loop.create_task(check_jobs())
+    loop.create_task(check_builds())
     loop.create_task(check_pipeline())
     loop.run_forever()
 
