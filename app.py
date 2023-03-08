@@ -134,7 +134,7 @@ def build_is_today(build: any) -> bool:
     # Check if the date of the datetime object is equal to today's date
     return dt.date() == today
 
-async def check_builds() -> None:
+async def check_build() -> None:
     """
     Polls the Jenkins API for build status and sends notifications for failed, long-running, or timed out builds.
 
@@ -226,7 +226,7 @@ async def check_pipeline() -> None:
 ## Main program runs here
 def main():
     loop = asyncio.get_event_loop()
-    loop.create_task(check_builds())
+    loop.create_task(check_build())
     loop.create_task(check_pipeline())
     loop.run_forever()
 
