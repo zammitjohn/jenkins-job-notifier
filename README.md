@@ -48,7 +48,7 @@ In order to set up the environment variables needed for this project, you should
 - `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 4.
 - `MAX_IN_PROGRESS_BUILDS`: The maximum number of builds that can be in progress within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 6.
 - `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 2.
-#### Builds
+#### Build
 - `MAX_IN_PROGRESS_BUILD_DURATION_SECONDS`: The maximum amount of time an in-progress build can take before triggering an alert, in seconds. Example: 10800 (3 hours).
 - `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum amount of time a build can run before being aborted and triggering an alert, in seconds. Example: 14400 (4 hours).
 - `MAX_FAILED_BUILD_ATTEMPTS`: The maximum number of times a build can fail before triggering an alert. Example: 4.
