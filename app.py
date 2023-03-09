@@ -164,7 +164,7 @@ async def check_build() -> None:
 
                     if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS:
                         notify('Build failed multiple times',
-                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times today.")
+                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.")
 
                 elif build_relative_time >= MAX_IN_PROGRESS_BUILD_DURATION_SECONDS and bool(build['building']):
                     ids_ignore.append(build['id'])
