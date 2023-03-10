@@ -17,7 +17,7 @@ Notifications are sent through a Microsoft Teams webhook.
 - Clone the repository or download the source code from GitHub.
 - Make sure you have Python 3 installed on your system.
 - Install the required packages by running pip install -r requirements.txt in your terminal.
-- Create the .env file with the necessary parameters. [See Configuration below](##Configuration).
+- Create the .env file with the necessary parameters. [See Configuration below](#configuration).
 - Run the app using python app.py.
 - Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file.
 
