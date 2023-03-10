@@ -165,12 +165,12 @@ async def check_builds() -> None:
 
                 build_relative_time = get_build_relative_time(build)
 
-                if build['result'] == "FAILURE" and build_is_today(build):
+                if build['result'] == "FAILURE":
                     display_names_failed.append(build['fullDisplayName'])
                     ids_ignore.append(build['id'])
                     build_failed_count = display_names_failed.count(build['fullDisplayName'])
 
-                    if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS:
+                    if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS and build_is_today(build):
                         notify('Build failed multiple times',
                             build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.",
                             build['id'])
