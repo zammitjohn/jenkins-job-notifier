@@ -1,5 +1,5 @@
 # Jenkins Job Notifier
-This Python application is designed to monitor a specific Jenkins pipeline through the Jenkins API continuously. The purpose of this app is to make it easier to keep track of the pipeline status and to be alerted to any issues that may occur spontaneously.
+This Python application is designed to monitor a specific Jenkins job through the Jenkins API continuously. The purpose of this app is to make it easier to keep track of the job status. It raises alarms when certain metrics exceed predefined thresholds, and sends notifications to a Microsoft Teams channel via webhook.
 
 ## Features
 The jenkins-job-notifier app checks the following metrics and raises alarms:
@@ -21,7 +21,7 @@ Notifications are sent through a Microsoft Teams webhook.
 - Run the app using python app.py.
 - Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file.
 
-The app will run in the background and will continuously check the pipeline status. Any errors will be displayed in the log.
+The app will run in the background and will continuously check the job status. Any errors will be displayed in the log.
 
 ## Configuration
 In order to set up the environment variables needed for this project, you should create a .env file in the root directory of your project with the following variables:
@@ -40,13 +40,13 @@ In order to set up the environment variables needed for this project, you should
 
 ### Polling frequency
 - `BUILD_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for build status. Example: 5.
-- `PIPELINE_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for pipeline status. Example: 3600 (1 hour).
+- `JOB_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for job status. Example: 3600 (1 hour).
 
 ### Thresholds
-#### Pipeline
-- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 4.
-- `MAX_IN_PROGRESS_BUILDS`: The maximum number of builds that can be in progress within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 6.
-- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `PIPELINE_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 2.
+#### Job
+- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 4.
+- `MAX_IN_PROGRESS_BUILDS`: The maximum number of builds that can be in progress within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 6.
+- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 2.
 #### Build
 - `MAX_IN_PROGRESS_BUILD_DURATION_SECONDS`: The maximum amount of time an in-progress build can take before triggering an alert, in seconds. Example: 10800 (3 hours).
 - `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum amount of time a build can run before being aborted and triggering an alert, in seconds. Example: 14400 (4 hours).
