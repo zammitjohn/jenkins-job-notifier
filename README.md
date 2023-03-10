@@ -17,8 +17,9 @@ Notifications are sent through a Microsoft Teams webhook.
 - Clone the repository or download the source code from GitHub.
 - Make sure you have Python 3 installed on your system.
 - Install the required packages by running pip install -r requirements.txt in your terminal.
-- Update the .env file with the necessary parameters. [See Configuration below](##Configuration).
+- Create the .env file with the necessary parameters. [See Configuration below](##Configuration).
 - Run the app using python app.py.
+- Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file.
 
 The app will run in the background and will continuously check the pipeline status. Any errors will be displayed in the log.
 
@@ -28,8 +29,6 @@ In order to set up the environment variables needed for this project, you should
 ### Jenkins configuration
 - `JENKINS_DOMAIN`: The domain name for your Jenkins server.
 - `JENKINS_JOB_NAME`: The name of the Jenkins job you want to monitor.
-- `JENKINS_URL`: The URL for your Jenkins server. Example: https://`${JENKINS_DOMAIN}`.
-- `JENKINS_API`: The API endpoint for your Jenkins job. Example: `${JENKINS_URL}`/job/`${JENKINS_JOB_NAME}`/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration].
 - `JENKINS_USERNAME`: The username to use for authentication with your Jenkins server.
 - `JENKINS_TOKEN`: The API token to use for authentication with your Jenkins server.
 

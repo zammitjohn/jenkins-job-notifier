@@ -19,7 +19,8 @@ from dotenv import load_dotenv
 
 print("Loading environment variables...")
 load_dotenv()
-JENKINS_API = os.getenv('JENKINS_API')
+JENKINS_DOMAIN = os.getenv('JENKINS_DOMAIN')
+JENKINS_JOB_NAME = os.getenv('JENKINS_JOB_NAME')
 JENKINS_USERNAME = os.getenv('JENKINS_USERNAME')
 JENKINS_TOKEN = os.getenv('JENKINS_TOKEN')
 TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL')
@@ -33,8 +34,9 @@ MAX_IN_PROGRESS_BUILD_DURATION_SECONDS = int(os.getenv('MAX_IN_PROGRESS_BUILD_DU
 MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_SECONDS'))
 MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS'))
 
-# Encode the API token in base64
-AUTH_STR = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8")
+JENKINS_URL = "https://" + JENKINS_DOMAIN
+JENKINS_API = JENKINS_URL + "/job/" + JENKINS_JOB_NAME + "/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration]"
+JENKINS_AUTH = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8") # Encode the API token in base64
 
 # logging configuration
 logging.basicConfig(filename=LOGS_FILENAME,
@@ -89,7 +91,7 @@ def get_jenkins_data() -> any:
     """    
     logging.info("Fetching data from Jenkins API")
     try:
-        response = requests.get(JENKINS_API, headers={"Authorization": f"Basic {AUTH_STR}"}, timeout=10)
+        response = requests.get(JENKINS_API, headers={"Authorization": f"Basic {JENKINS_AUTH}"}, timeout=10)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as error:
@@ -164,7 +166,7 @@ async def check_build() -> None:
 
                     if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS:
                         notify('Build failed multiple times',
-                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times today.")
+                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.")
 
                 elif build_relative_time >= MAX_IN_PROGRESS_BUILD_DURATION_SECONDS and bool(build['building']):
                     ids_ignore.append(build['id'])
