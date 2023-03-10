@@ -35,7 +35,8 @@ MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_S
 MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS'))
 
 JENKINS_URL = "https://" + JENKINS_DOMAIN
-JENKINS_API = JENKINS_URL + "/job/" + JENKINS_JOB_NAME + "/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration]"
+JENKINS_JOB_URL = JENKINS_URL + "/job/" + JENKINS_JOB_NAME
+JENKINS_API = JENKINS_JOB_URL + "/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration]"
 JENKINS_AUTH = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8") # Encode the API token in base64
 
 # logging configuration
@@ -45,28 +46,33 @@ logging.basicConfig(filename=LOGS_FILENAME,
                     datefmt='%H:%M:%S',
                     level=logging.DEBUG)
 
-def notify(title: str, text: str) -> None:
+def notify(title: str, text: str, build_id: int = None) -> None:
     """
-    Sends a notification message to a Microsoft Teams channel using a webhook URL.
+    Sends a notification message to Microsoft Teams channel via a webhook.
 
     Args:
-        title (str): The title of the notification message.
-        text (str): The body text of the notification message.
+        title: A string representing the title of the notification message.
+        text: A string representing the body of the notification message.
+        build_id: An optional integer representing the ID of the Jenkins build.
+            If provided, a link button to view the build details will be included
+            in the message. If not provided, a link button to view the Jenkins
+            job details will be included instead. Default is None.
 
     Returns:
         None
 
     Raises:
-        pymsteams.TeamsWebhookException: If an error occurs while sending the message.
-
-    The function attempts to send the notification message to the Teams channel using the
-    specified title and text. If an exception occurs, an error is logged and the message is
-    printed to the console using the pymsteams printme() function.
-    """    
+        pymsteams.TeamsWebhookException: If the notification message fails to
+            send via the Microsoft Teams webhook.
+    """
     try:
         teamsMessage = pymsteams.connectorcard(TEAMS_WEBHOOK_URL)
         teamsMessage.title(title)
         teamsMessage.text(text)
+        if build_id:
+            teamsMessage.addLinkButton("View Build Details", JENKINS_JOB_URL + "/" + build_id)
+        else:
+            teamsMessage.addLinkButton("View Job Details", JENKINS_JOB_URL)
         teamsMessage.send()
     except pymsteams.TeamsWebhookException:
         logging.error("Failed to send notification message")
@@ -166,17 +172,20 @@ async def check_build() -> None:
 
                     if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS:
                         notify('Build failed multiple times',
-                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.")
+                            build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.",
+                            build['id'])
 
                 elif build_relative_time >= MAX_IN_PROGRESS_BUILD_DURATION_SECONDS and bool(build['building']):
                     ids_ignore.append(build['id'])
                     notify('Build still in progress',
-                        build['fullDisplayName'] + " has been building for the last " + str(round(float(build_relative_time/3600))) + " hours.")
+                        build['fullDisplayName'] + " has been building for the last " + str(round(float(build_relative_time/3600))) + " hours.",
+                        build['id'])
 
                 elif build['duration']/1000 >= MAX_ABORTED_BUILD_DURATION_SECONDS and build['result'] == "ABORTED" and build_is_today(build):
                     ids_ignore.append(build['id'])
                     notify('Build has timed out',
-                        build['fullDisplayName'] + " aborted after " + str(round(float(build['duration']/3.6e+6),2)) + " hours.")                                      
+                        build['fullDisplayName'] + " aborted after " + str(round(float(build['duration']/3.6e+6),2)) + " hours.",
+                        build['id'])                                      
 
         await asyncio.sleep(BUILD_POLL_FREQUENCY_SECONDS)
         
