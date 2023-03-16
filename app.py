@@ -24,13 +24,13 @@ JENKINS_JOB_NAME = os.getenv('JENKINS_JOB_NAME')
 JENKINS_USERNAME = os.getenv('JENKINS_USERNAME')
 JENKINS_TOKEN = os.getenv('JENKINS_TOKEN')
 TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL')
-LOGS_FILENAME = os.getenv('LOGS_FILENAME')
 BUILD_POLL_FREQUENCY_SECONDS = int(os.getenv('BUILD_POLL_FREQUENCY_SECONDS'))
 JOB_POLL_FREQUENCY_SECONDS = int(os.getenv('JOB_POLL_FREQUENCY_SECONDS'))
+MAX_RUNNING_BUILDS = int(os.getenv('MAX_RUNNING_BUILDS'))
 MAX_ABORTED_BUILDS = int(os.getenv('MAX_ABORTED_BUILDS'))
-MAX_IN_PROGRESS_BUILDS = int(os.getenv('MAX_IN_PROGRESS_BUILDS'))
+MAX_EXECUTED_BUILDS = int(os.getenv('MAX_EXECUTED_BUILDS'))
 MAX_FAILED_BUILDS = int(os.getenv('MAX_FAILED_BUILDS'))
-MAX_IN_PROGRESS_BUILD_DURATION_SECONDS = int(os.getenv('MAX_IN_PROGRESS_BUILD_DURATION_SECONDS'))
+MAX_RUNNING_BUILD_DURATION_SECONDS = int(os.getenv('MAX_RUNNING_BUILD_DURATION_SECONDS'))
 MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_SECONDS'))
 MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS'))
 
@@ -40,7 +40,7 @@ JENKINS_API = JENKINS_JOB_URL + "/api/json?tree=builds[building,result,timestamp
 JENKINS_AUTH = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8") # Encode the API token in base64
 
 # logging configuration
-logging.basicConfig(filename=LOGS_FILENAME,
+logging.basicConfig(filename=".log",
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
@@ -144,16 +144,9 @@ def build_is_today(build: any) -> bool:
 
 async def check_builds() -> None:
     """
-    Polls the Jenkins API for build status and sends notifications for failed, long-running, or timed out builds.
-
-    The function enters an infinite loop and repeatedly fetches build data from the Jenkins API using the get_jenkins_data()
-    function. For each build in the list of builds, the function checks if the build ID is in the ids_ignore list. If not,
-    the function calculates the relative time since the build started using the get_build_relative_time() function. Depending
-    on the build status and duration, the function sends a notification via the notify() function with details of the build and
-    its status.
-
-    The function sleeps for a fixed interval of BUILD_POLL_FREQUENCY_SECONDS between each API request.
-    The function runs indefinitely until it is stopped externally.
+    Polls the Jenkins API for build status and sends notifications for long-running, timed out and failed builds.
+    The function sleeps for a fixed interval of BUILD_POLL_FREQUENCY_SECONDS between each API request and runs 
+    indefinitely until it is stopped externally.
     """
     display_names_failed = []
     ids_ignore = []        
@@ -175,10 +168,10 @@ async def check_builds() -> None:
                             build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.",
                             build['id'])
 
-                elif build_relative_time >= MAX_IN_PROGRESS_BUILD_DURATION_SECONDS and bool(build['building']):
+                elif build_relative_time >= MAX_RUNNING_BUILD_DURATION_SECONDS and bool(build['building']):
                     ids_ignore.append(build['id'])
-                    notify('Build still in progress',
-                        build['fullDisplayName'] + " has been building for the last " + str(round(float(build_relative_time/3600), 1)) + " hours.",
+                    notify('Build still running',
+                        build['fullDisplayName'] + " has been running for the last " + str(round(float(build_relative_time/3600), 1)) + " hours.",
                         build['id'])
 
                 elif build['duration']/1000 >= MAX_ABORTED_BUILD_DURATION_SECONDS and build['result'] == "ABORTED" and build_is_today(build):
@@ -191,34 +184,35 @@ async def check_builds() -> None:
         
 async def check_job() -> None:
     """
-    Polls the Jenkins API for job status and sends notifications for aborted, failed, or long-running builds.
-
-    The function enters an infinite loop and repeatedly fetches build data from the Jenkins API using the get_jenkins_data()
-    function. For each build in the list of builds, the function checks if the build has been running for less than or equal to
-    JOB_POLL_FREQUENCY_SECONDS. If so, the function checks the build result and building status and increments counters
-    for aborted, failed, and in-progress builds. After processing all builds, the function checks if any of the counters exceed
-    their respective MAX_*_BUILDS thresholds. If so, the function sends a notification via the notify() function with details
-    of the builds and their status.
-
-    The function sleeps for a fixed interval of JOB_POLL_FREQUENCY_SECONDS between each API request. 
-    The function runs indefinitely until it is stopped externally.
+    Polls the Jenkins API for job status and sends notifications according to the number of running, aborted, 
+    executed, or failed builds. The function sleeps for a fixed interval of JOB_POLL_FREQUENCY_SECONDS between
+    each API request. The function runs indefinitely until it is stopped externally.
     """    
     while True:
         logging.info("Checking job")
+        count_running_builds = 0
         count_aborted_builds = 0
         count_failed_builds = 0
-        count_in_progress_builds = 0
+        count_executed_builds = 0
         builds = get_jenkins_data()['builds']
 
         for build in builds:
             build_relative_time = get_build_relative_time(build)
+
+            if bool(build['building']):
+                count_running_builds += 1
+
             if build_relative_time <= JOB_POLL_FREQUENCY_SECONDS:
                 if build['result'] == "ABORTED":
                     count_aborted_builds += 1
                 elif build['result'] == "FAILURE":
                     count_failed_builds += 1
                 elif bool(build['building']):
-                    count_in_progress_builds += 1          
+                    count_executed_builds += 1          
+
+        if count_running_builds >= MAX_RUNNING_BUILDS:
+            notify('Several builds running',
+                str(count_running_builds) + " builds currently running.")
 
         if count_aborted_builds >= MAX_ABORTED_BUILDS:
             notify('Several builds aborted',
@@ -228,9 +222,9 @@ async def check_job() -> None:
             notify('Several builds failed',
                 str(count_failed_builds) + " builds failed within the last " + str(round(float(JOB_POLL_FREQUENCY_SECONDS/3600), 1)) + " hours.")
             
-        if count_in_progress_builds >= MAX_IN_PROGRESS_BUILDS:
-            notify('Several builds building',
-                str(count_in_progress_builds) + " builds executed within the last " + str(round(float(JOB_POLL_FREQUENCY_SECONDS/3600), 1)) + " hours.")
+        if count_executed_builds >= MAX_EXECUTED_BUILDS:
+            notify('Several builds executed',
+                str(count_executed_builds) + " builds executed within the last " + str(round(float(JOB_POLL_FREQUENCY_SECONDS/3600), 1)) + " hours.")
         
         await asyncio.sleep(JOB_POLL_FREQUENCY_SECONDS)
 

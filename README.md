@@ -7,6 +7,7 @@ The jenkins-job-notifier app checks the following metrics and raises alarms:
 - Consecutive Failures: The app raises an alarm when the same build fails a number of consecutive times.
 - Build Execution Time: The app raises an alarm when a build takes a certain number of hours.
 - Timed Out Builds: The app raises an alarm when a build gets ABORTED after a certain number of hours.
+- Multiple Builds Running: The app raises an alarm when a specified number of builds are running simultaneously.
 - Multiple Builds Execution: The app raises an alarm when a number of builds get executed within a specified timespan.
 - Multiple Aborted Builds: The app raises an alarm when a certain number of builds get ABORTED within a specified timespan.
 - Multiple Build Failures: The app raises an alarm when a number of builds fail within a specified timespan.
@@ -35,19 +36,17 @@ In order to set up the environment variables needed for this project, you should
 ### Teams notifications
 - `TEAMS_WEBHOOK_URL`: The URL for the Microsoft Teams webhook you want to use for notifications.
 
-### Log file
-- `LOGS_FILENAME`: The name of the log file you want to use. Example: log.
-
 ### Polling frequency
 - `BUILD_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for build status. Example: 5.
 - `JOB_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for job status. Example: 3600 (1 hour).
 
 ### Thresholds
 #### Job
-- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 4.
-- `MAX_IN_PROGRESS_BUILDS`: The maximum number of builds that can be in progress within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 6.
-- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS` before triggering an alert. Example: 2.
+- `MAX_RUNNING_BUILDS`: The maximum number of running builds, checked every `JOB_POLL_FREQUENCY_SECONDS`. Example: 8. 
+- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS`. Example: 4.
+- `MAX_EXECUTED_BUILDS`: The maximum number of builds that can be executed within `JOB_POLL_FREQUENCY_SECONDS`. Example: 6.
+- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS`. Example: 2.
 #### Build
-- `MAX_IN_PROGRESS_BUILD_DURATION_SECONDS`: The maximum amount of time an in-progress build can take before triggering an alert, in seconds. Example: 10800 (3 hours).
-- `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum amount of time a build can run before being aborted and triggering an alert, in seconds. Example: 14400 (4 hours).
-- `MAX_FAILED_BUILD_ATTEMPTS`: The maximum number of times a build can fail before triggering an alert. Example: 4.
+- `MAX_RUNNING_BUILD_DURATION_SECONDS`: The maximum duration a running build can take, in seconds. Example: 10800 (3 hours).
+- `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum duration a build can run before being aborted, in seconds. Example: 14400 (4 hours).
+- `MAX_FAILED_BUILD_ATTEMPTS`: The maximum number of times a build can fail. Example: 3.
