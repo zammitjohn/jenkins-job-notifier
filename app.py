@@ -80,9 +80,9 @@ def notify(title: str, text: str, build_id: int = None) -> None:
 
 # Decorate the function that makes the requests with the retry decorator
 @retry(delay=2, backoff=2, max_delay=30, jitter=(1, 3))
-def get_jenkins_data() -> any:
+def get_jenkins_builds() -> any:
     """
-    Fetches data from the Jenkins API and returns it as a JSON object.
+    Fetches builds from the Jenkins API and returns it as a JSON object.
 
     Returns:
         A JSON object representing the data fetched from the Jenkins API.
@@ -99,7 +99,7 @@ def get_jenkins_data() -> any:
     try:
         response = requests.get(JENKINS_API, headers={"Authorization": f"Basic {JENKINS_AUTH}"}, timeout=10)
         response.raise_for_status()
-        return response.json()
+        return reversed(response.json()['builds'])
     except requests.exceptions.HTTPError as error:
         logging.error("Failed to fetch data: %s", str(error))
         notify('Jenkins API data fetch failed', 
@@ -152,8 +152,8 @@ async def check_builds() -> None:
     ids_ignore = []        
     while True:
         logging.info("Checking builds")
-        builds = get_jenkins_data()['builds']
-        for build in builds:
+
+        for build in get_jenkins_builds():
             if build['id'] not in ids_ignore:
 
                 build_relative_time = get_build_relative_time(build)
@@ -185,7 +185,7 @@ async def check_builds() -> None:
 async def check_job() -> None:
     """
     Polls the Jenkins API for job status and sends notifications according to the number of running, aborted, 
-    executed, or failed builds. The function sleeps for a fixed interval of JOB_POLL_FREQUENCY_SECONDS between
+    executed, and failed builds. The function sleeps for a fixed interval of JOB_POLL_FREQUENCY_SECONDS between
     each API request. The function runs indefinitely until it is stopped externally.
     """    
     while True:
@@ -194,9 +194,8 @@ async def check_job() -> None:
         count_aborted_builds = 0
         count_failed_builds = 0
         count_executed_builds = 0
-        builds = get_jenkins_data()['builds']
 
-        for build in builds:
+        for build in get_jenkins_builds():
             build_relative_time = get_build_relative_time(build)
 
             if bool(build['building']):
