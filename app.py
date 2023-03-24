@@ -17,13 +17,29 @@ import pymsteams
 from retry import retry
 from dotenv import load_dotenv
 
+def get_required_env(env: str) -> str:
+    """
+    Returns the value of the specified environment variable.
+
+    Args:
+        env: A string specifying the name of the environment variable to retrieve.
+
+    Returns:
+        The value of the specified environment variable.
+
+    Raises:
+        SystemExit: If the specified environment variable is not set, the function terminates the program and prints
+        an error message to the console.
+    """    
+    return os.getenv(env) or sys.exit('Missing required environment variable ' + env)
+
 print("Loading environment variables...")
 load_dotenv()
-JENKINS_DOMAIN = os.getenv('JENKINS_DOMAIN')
-JENKINS_JOB_NAME = os.getenv('JENKINS_JOB_NAME')
-JENKINS_USERNAME = os.getenv('JENKINS_USERNAME')
-JENKINS_TOKEN = os.getenv('JENKINS_TOKEN')
-TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL')
+JENKINS_DOMAIN = get_required_env('JENKINS_DOMAIN')
+JENKINS_JOB_NAME = get_required_env('JENKINS_JOB_NAME')
+JENKINS_USERNAME = get_required_env('JENKINS_USERNAME')
+JENKINS_TOKEN = get_required_env('JENKINS_TOKEN')
+TEAMS_WEBHOOK_URL = get_required_env('TEAMS_WEBHOOK_URL')
 BUILD_POLL_FREQUENCY_SECONDS = int(os.getenv('BUILD_POLL_FREQUENCY_SECONDS') or 5)
 JOB_POLL_FREQUENCY_SECONDS = int(os.getenv('JOB_POLL_FREQUENCY_SECONDS') or 5400)
 MAX_ABORTED_BUILDS = int(os.getenv('MAX_ABORTED_BUILDS') or 4)
