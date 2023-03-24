@@ -37,16 +37,14 @@ In order to set up the environment variables needed for this project, you should
 - `TEAMS_WEBHOOK_URL`: The URL for the Microsoft Teams webhook you want to use for notifications.
 
 ### Polling frequency
-- `BUILD_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for build status. Example: 5.
-- `JOB_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for job status. Example: 3600 (1 hour).
+- `BUILD_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for build status. Default: 5.
+- `JOB_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for job status. Default: 5400 (1 hour), disable by setting to -1.
 
 ### Thresholds
-#### Job
-- `MAX_RUNNING_BUILDS`: The maximum number of running builds, checked every `JOB_POLL_FREQUENCY_SECONDS`. Example: 8. 
-- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS`. Example: 4.
-- `MAX_EXECUTED_BUILDS`: The maximum number of builds that can be executed within `JOB_POLL_FREQUENCY_SECONDS`. Example: 6.
-- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS`. Example: 2.
-#### Build
-- `MAX_RUNNING_BUILD_DURATION_SECONDS`: The maximum duration a running build can take, in seconds. Example: 10800 (3 hours).
-- `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum duration a build can run before being aborted, in seconds. Example: 14400 (4 hours).
-- `MAX_FAILED_BUILD_ATTEMPTS`: The maximum number of times a build can fail. Example: 3.
+- `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS`. Default: 4.
+- `MAX_EXECUTED_BUILDS`: The maximum number of builds that can be executed within `JOB_POLL_FREQUENCY_SECONDS`. Default: 6.
+- `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS`. Default: 3.
+- `MAX_RUNNING_BUILDS`: The maximum number of running builds. Default: 8.
+- `MAX_RUNNING_BUILD_DURATION_SECONDS`: The maximum duration a running build can take, in seconds. Default: 10800 (3 hours).
+- `MAX_ABORTED_BUILD_DURATION_SECONDS`: The maximum duration a build can run before being aborted, in seconds. Default: 14400 (4 hours).
+- `MAX_FAILED_BUILD_ATTEMPTS`: The maximum number of times a build can fail. Default: 3.
