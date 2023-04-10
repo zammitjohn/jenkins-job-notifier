@@ -170,12 +170,12 @@ async def check_builds() -> None:
                     
     while True:
         logging.info("Checking builds")
-        display_names_running = []
+        ids_running = []
 
         for build in get_jenkins_builds():
 
             if bool(build['building']):
-                display_names_running.append(build['fullDisplayName'])
+                ids_running.append(build['id'])
 
             if build['id'] not in ids_checked:
 
@@ -208,13 +208,13 @@ async def check_builds() -> None:
         of existing hashes, and sends a notification if the hash is not already in the list and the number
         of running builds exceeds the defined maximum value. 
         """
-        builds_running_hash = hash(str(display_names_running))
-        builds_running_count = len(display_names_running)
+        builds_running_hash = hash(str(ids_running))
+        builds_running_count = len(ids_running)
         if builds_running_hash not in hashes_running:
             hashes_running.append(builds_running_hash)
             if builds_running_count >= MAX_RUNNING_BUILDS:
                 notify('Several ' + JENKINS_JOB_NAME + ' builds running',
-                    str(builds_running_count) + " builds currently running: " + ', '.join(display_names_running))
+                    str(builds_running_count) + " builds currently running.")
 
         await asyncio.sleep(BUILD_POLL_FREQUENCY_SECONDS)
         
