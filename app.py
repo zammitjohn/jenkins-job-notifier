@@ -155,13 +155,17 @@ def save_data(json_key: str, data: dict) -> None:
         
     Returns:
         None
-    """    
-    # Write the data to the JSON file
+    """
     try:
         if os.path.isfile(DATA_FILE_PATH):
             # File exists, so load the contents of the current JSON file into a dictionary
             with open(DATA_FILE_PATH, 'r') as file:
-                json_data = json.load(file)               
+                json_data = json.load(file)
+
+            # Data unchanged, so skip saving
+            if json_data.get(json_key) == data:
+                return None
+                            
             # Update the value of a specific key in the dictionary   
             json_data[json_key] = data
         else:
