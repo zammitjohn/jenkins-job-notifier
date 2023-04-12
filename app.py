@@ -50,6 +50,7 @@ MAX_RUNNING_BUILD_DURATION_SECONDS = int(os.getenv('MAX_RUNNING_BUILD_DURATION_S
 MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_SECONDS') or 14400)
 MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS') or 3)
 DATA_DIRECTORY = "data"
+DATA_FILE_PATH = os.path.join(DATA_DIRECTORY, "data.json")
 JENKINS_URL = "https://" + JENKINS_DOMAIN
 JENKINS_JOB_URL = JENKINS_URL + "/job/" + JENKINS_JOB_NAME
 JENKINS_API = JENKINS_JOB_URL + "/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration]"
@@ -144,50 +145,55 @@ def build_is_today(build: any) -> bool:
     # Check if the date of the datetime object is equal to today's date
     return dt.date() == today
 
-def save_data(data_list: list, file_name: str) -> None:
+def save_data(json_key: str, data: dict) -> None:
     """
-    Saves a list of data to a JSON file.
-
+    Saves the given data to a JSON file under the specified key.
+    
     Args:
-        data_list: The list of data to be saved.
-        file_name: The name of the file to save the data to.
-
+        json_key: The key used to identify the data in the JSON file.
+        data: The data to be saved.
+        
     Returns:
         None
-    """
-    # Join the file name with the data directory path
-    file_path = os.path.join(DATA_DIRECTORY, file_name + '.json')
-
+    """    
     # Write the data to the JSON file
     try:
-        with open(file_path, "w") as file:
-            json.dump(data_list, file)
-        logging.info("Saved %s to disk", str(file_path))    
-    except Exception as error: 
-        logging.warning("Failed to save data: %s", str(error))
+        if os.path.isfile(DATA_FILE_PATH):
+            # File exists, so load the contents of the current JSON file into a dictionary
+            with open(DATA_FILE_PATH, 'r') as file:
+                json_data = json.load(file)               
+            # Update the value of a specific key in the dictionary   
+            json_data[json_key] = data
+        else:
+            json_data = {json_key: data}
 
-def load_data(file_name: str) -> list:
+        # Write the updated dictionary to the JSON file
+        with open(DATA_FILE_PATH, "w") as file:
+            json.dump(json_data, file, indent=4)
+        logging.info("Saved '%s' data", json_key)    
+    except Exception as error: 
+        logging.warning("Failed to save '%s' data: %s", json_key, str(error))
+
+def load_data(json_key: str) -> dict:
     """
-    Load data from a JSON file.
+    Loads and returns the data associated with the given key from a JSON file.
 
     Args:
-        file_name: The name of the JSON file to be loaded.
+        json_key: The key used to identify the data in the JSON file.
 
     Returns:
-        list: A list of data loaded from the JSON file.
-    """        
-     # Join the file name with the data directory path
-    file_path = os.path.join(DATA_DIRECTORY, file_name + '.json')
-    
+        Data loaded from the JSON file, or an empty dictionary if loading fails.
+    """          
     # Load an return the data from the JSON file
     try:
-        with open(file_path) as f:
+        # Load the contents of the current JSON file into a dictionary
+        with open(DATA_FILE_PATH) as f:
             data = json.load(f)
-        logging.info("Loaded data from: %s", str(file_path))
-        return data
+        logging.info("Loaded '%s' data", json_key)
+        return data[json_key]
     except Exception as error: 
-        logging.warning("%s not loaded: %s", str(file_path), str(error))
-        return []
+        logging.warning("Failed to load '%s' data: %s", json_key, str(error))
+        return {}
 
 async def check_builds() -> None:
     """
@@ -195,8 +201,8 @@ async def check_builds() -> None:
     failed builds. The function sleeps for a fixed interval of BUILD_POLL_FREQUENCY_SECONDS between each API 
     request and runs indefinitely until it is stopped externally.
     """
-    display_names_failed = load_data("failed")
-    ids_checked = load_data("checked")
+    errors_dict = load_data("errors")
+    long_running_dict = load_data("longRunning")
     hashes_running = []
                     
     while True:
@@ -208,32 +214,39 @@ async def check_builds() -> None:
             if bool(build['building']):
                 ids_running.append(build['id'])
 
-            if build['id'] not in ids_checked:
+            if build['id'] not in errors_dict:
+                if build['result'] == "FAILURE":                
+                    errors_dict[build['id']] = {
+                        "result": build['result'],
+                        "fullDisplayName": build['fullDisplayName']
+                    }
 
-                build_relative_time = get_build_relative_time(build)
-
-                if build['result'] == "FAILURE":
-                    display_names_failed.append(build['fullDisplayName'])
-                    ids_checked.append(build['id'])
-                    build_failed_count = display_names_failed.count(build['fullDisplayName'])
-
+                    build_failed_count = sum(1 for inner_dict in errors_dict.values() if inner_dict['fullDisplayName'] == build['fullDisplayName'] and inner_dict['result'] == 'FAILURE')
                     if build_failed_count >= MAX_FAILED_BUILD_ATTEMPTS and build_is_today(build):
                         notify('Build failed multiple times',
                             build['fullDisplayName'] + " has failed " + str(build_failed_count) + " times.",
                             build['id'])
 
-                elif build_relative_time >= MAX_RUNNING_BUILD_DURATION_SECONDS and bool(build['building']):
-                    ids_checked.append(build['id'])
+                elif build['duration']/1000 >= MAX_ABORTED_BUILD_DURATION_SECONDS and build['result'] == "ABORTED" and build_is_today(build):
+                    errors_dict[build['id']] = {
+                        "result": build['result'],
+                        "fullDisplayName": build['fullDisplayName']
+                    }
+                    notify('Build has timed out',
+                        build['fullDisplayName'] + " aborted after " + str(round(float(build['duration']/3.6e+6), 1)) + " hours.",
+                        build['id'])
+
+            if build['id'] not in long_running_dict:
+                build_relative_time = get_build_relative_time(build)
+                if build_relative_time >= MAX_RUNNING_BUILD_DURATION_SECONDS and bool(build['building']):
+                    long_running_dict[build['id']] = {
+                        "timestamp": build['timestamp'],
+                        "fullDisplayName": build['fullDisplayName']
+                    }
                     notify('Build still running',
                         build['fullDisplayName'] + " has been running for the last " + str(round(float(build_relative_time/3600), 1)) + " hours.",
                         build['id'])
-
-                elif build['duration']/1000 >= MAX_ABORTED_BUILD_DURATION_SECONDS and build['result'] == "ABORTED" and build_is_today(build):
-                    ids_checked.append(build['id'])
-                    notify('Build has timed out',
-                        build['fullDisplayName'] + " aborted after " + str(round(float(build['duration']/3.6e+6), 1)) + " hours.",
-                        build['id'])          
-        
+ 
         """ 
         the following creates a hash of a list of display names for running builds, compares it to a list 
         of existing hashes, and sends a notification if the hash is not already in the list and the number
@@ -247,8 +260,8 @@ async def check_builds() -> None:
                 notify('Several ' + JENKINS_JOB_NAME + ' builds running',
                     str(builds_running_count) + " builds currently running.")
 
-        save_data(display_names_failed, "failed")
-        save_data(ids_checked, "checked")
+        save_data("errors", errors_dict)
+        save_data("longRunning", long_running_dict)
         await asyncio.sleep(BUILD_POLL_FREQUENCY_SECONDS)
         
 async def check_job() -> None:
