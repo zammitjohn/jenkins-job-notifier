@@ -11,6 +11,7 @@ import logging
 import base64
 import datetime
 import sys
+import json
 import asyncio
 import requests
 import pymsteams
@@ -27,9 +28,8 @@ def get_required_env(env: str) -> str:
     Returns:
         The value of the specified environment variable.
 
-    Raises:
-        SystemExit: If the specified environment variable is not set, the function terminates the program and prints
-        an error message to the console.
+    If the specified environment variable is not set, the function terminates the program and prints
+    an error message to the console.
     """    
     return os.getenv(env) or sys.exit('Missing required environment variable ' + env)
 
@@ -49,18 +49,11 @@ MAX_RUNNING_BUILDS = int(os.getenv('MAX_RUNNING_BUILDS') or 8)
 MAX_RUNNING_BUILD_DURATION_SECONDS = int(os.getenv('MAX_RUNNING_BUILD_DURATION_SECONDS') or 10800)
 MAX_ABORTED_BUILD_DURATION_SECONDS = int(os.getenv('MAX_ABORTED_BUILD_DURATION_SECONDS') or 14400)
 MAX_FAILED_BUILD_ATTEMPTS = int(os.getenv('MAX_FAILED_BUILD_ATTEMPTS') or 3)
-
+DATA_DIRECTORY = "data"
 JENKINS_URL = "https://" + JENKINS_DOMAIN
 JENKINS_JOB_URL = JENKINS_URL + "/job/" + JENKINS_JOB_NAME
 JENKINS_API = JENKINS_JOB_URL + "/api/json?tree=builds[building,result,timestamp,id,fullDisplayName,duration]"
 JENKINS_AUTH = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("utf-8")).decode("utf-8") # Encode the API token in base64
-
-# logging configuration
-logging.basicConfig(filename=".log",
-                    filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.DEBUG)
 
 def notify(title: str, text: str, build_id: int = None) -> None:
     """
@@ -76,10 +69,6 @@ def notify(title: str, text: str, build_id: int = None) -> None:
 
     Returns:
         None
-
-    Raises:
-        pymsteams.TeamsWebhookException: If the notification message fails to
-            send via the Microsoft Teams webhook.
     """
     try:
         teamsMessage = pymsteams.connectorcard(TEAMS_WEBHOOK_URL)
@@ -102,9 +91,6 @@ def get_jenkins_builds() -> any:
 
     Returns:
         A JSON object representing the data fetched from the Jenkins API.
-
-    Raises:
-        requests.exceptions.HTTPError: If an HTTP error occurs while fetching the data.
 
     The function makes a GET request to the Jenkins API endpoint with the specified
     authorization header and timeout. If the request is successful, the response JSON
@@ -158,14 +144,59 @@ def build_is_today(build: any) -> bool:
     # Check if the date of the datetime object is equal to today's date
     return dt.date() == today
 
+def save_data(data_list: list, file_name: str) -> None:
+    """
+    Saves a list of data to a JSON file.
+
+    Args:
+        data_list: The list of data to be saved.
+        file_name: The name of the file to save the data to.
+
+    Returns:
+        None
+    """
+    # Join the file name with the data directory path
+    file_path = os.path.join(DATA_DIRECTORY, file_name + '.json')
+
+    # Write the data to the JSON file
+    try:
+        with open(file_path, "w") as file:
+            json.dump(data_list, file)
+        logging.info("Saved %s to disk", str(file_path))    
+    except Exception as error: 
+        logging.warning("Failed to save data: %s", str(error))
+
+def load_data(file_name: str) -> list:
+    """
+    Load data from a JSON file.
+
+    Args:
+        file_name: The name of the JSON file to be loaded.
+
+    Returns:
+        list: A list of data loaded from the JSON file.
+    """        
+     # Join the file name with the data directory path
+    file_path = os.path.join(DATA_DIRECTORY, file_name + '.json')
+    
+    # Load an return the data from the JSON file
+    try:
+        with open(file_path) as f:
+            data = json.load(f)
+        logging.info("Loaded data from: %s", str(file_path))
+        return data
+    except Exception as error: 
+        logging.warning("%s not loaded: %s", str(file_path), str(error))
+        return []
+
 async def check_builds() -> None:
     """
     Polls the Jenkins API for build status and sends notifications for long-running and running, timed out and 
     failed builds. The function sleeps for a fixed interval of BUILD_POLL_FREQUENCY_SECONDS between each API 
     request and runs indefinitely until it is stopped externally.
     """
-    display_names_failed = []
-    ids_checked = []
+    display_names_failed = load_data("failed")
+    ids_checked = load_data("checked")
     hashes_running = []
                     
     while True:
@@ -216,6 +247,8 @@ async def check_builds() -> None:
                 notify('Several ' + JENKINS_JOB_NAME + ' builds running',
                     str(builds_running_count) + " builds currently running.")
 
+        save_data(display_names_failed, "failed")
+        save_data(ids_checked, "checked")
         await asyncio.sleep(BUILD_POLL_FREQUENCY_SECONDS)
         
 async def check_job() -> None:
@@ -257,11 +290,26 @@ async def check_job() -> None:
 
 ## Main program runs here
 def main():
-    loop = asyncio.get_event_loop()
-    loop.create_task(check_builds())
-    if JOB_POLL_FREQUENCY_SECONDS != -1:
-        loop.create_task(check_job())
-    loop.run_forever()
+
+    # Create the data directory if it does not exist
+    os.makedirs(DATA_DIRECTORY, exist_ok=True)
+
+    # logging configuration
+    logfile = os.path.join(DATA_DIRECTORY, '.log')
+    os.makedirs(os.path.dirname(logfile), exist_ok=True)
+    logging.basicConfig(filename=logfile,
+                        filemode='a',
+                        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging.DEBUG)
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(check_builds())
+        if JOB_POLL_FREQUENCY_SECONDS != -1:
+            loop.create_task(check_job())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        logging.info("Keyboard interrupt detected, stopping program...")        
 
 if __name__ == "__main__":
     main()

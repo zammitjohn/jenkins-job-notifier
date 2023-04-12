@@ -20,7 +20,10 @@ Notifications are sent through a Microsoft Teams webhook.
 - Install the required packages by running pip install -r requirements.txt in your terminal.
 - Create the .env file with the necessary parameters. [See Configuration below](#configuration).
 - Run the app using python app.py.
-- Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file.
+- Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file:
+    ```
+    docker run --detach --volume $(pwd)/data:/app/data --env-file .env jenkins-job-notifier
+    ```
 
 The app will run in the background and will continuously check the job status. Any errors will be displayed in the log.
 
