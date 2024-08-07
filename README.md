@@ -1,5 +1,5 @@
 # Jenkins Job Notifier
-This Python application is designed to monitor a specific Jenkins job through the Jenkins API continuously. The purpose of this app is to make it easier to keep track of the job status. It raises alarms when certain metrics exceed predefined thresholds, and sends notifications to a Microsoft Teams channel via webhook.
+This Python application is designed to monitor a specific Jenkins job through the Jenkins API continuously. The purpose of this app is to make it easier to keep track of the job status. It raises alarms when certain metrics exceed predefined thresholds, and sends notifications to Microsoft Teams via Microsoft Power Automate workflows.
 
 ## Features
 The jenkins-job-notifier app checks the following metrics and raises alarms:
@@ -12,7 +12,7 @@ The jenkins-job-notifier app checks the following metrics and raises alarms:
 - Multiple Aborted Builds: The app raises an alarm when a certain number of builds get ABORTED within a specified timespan.
 - Multiple Build Failures: The app raises an alarm when a number of builds fail within a specified timespan.
 
-Notifications are sent through a Microsoft Teams webhook.
+Notifications are sent through a webhook.
 
 ## Installation and Usage
 - Clone the repository or download the source code from GitHub.

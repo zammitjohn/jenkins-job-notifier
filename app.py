@@ -1,11 +1,3 @@
-"""
-jenkins-job-notifier
-
-This Python application is designed to monitor a specific Jenkins job through the Jenkins API continuously. 
-The purpose of this app is to make it easier to keep track of the job status. It raises alarms when certain 
-metrics exceed predefined thresholds, and sends notifications to a Microsoft Teams channel via webhook.
-
-"""
 import os
 import logging
 import base64
@@ -58,7 +50,7 @@ JENKINS_AUTH = base64.b64encode(f"{JENKINS_USERNAME}:{JENKINS_TOKEN}".encode("ut
 
 def notify(title: str, text: str, build_id: int = None) -> None:
     """
-    Sends a notification message to Microsoft Teams channel via a webhook.
+    Sends a notification message through a webhook.
 
     Args:
         title: A string representing the title of the notification message.
