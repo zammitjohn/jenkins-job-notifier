@@ -1,7 +1,9 @@
 # Jenkins Job Notifier
+
 This Python application is designed to monitor a specific Jenkins job through the Jenkins API continuously. The purpose of this app is to make it easier to keep track of the job status. It raises alarms when certain metrics exceed predefined thresholds, and sends notifications to Microsoft Teams via Microsoft Power Automate workflows.
 
 ## Features
+
 The jenkins-job-notifier app checks the following metrics and raises alarms:
 
 - Consecutive Failures: The app raises an alarm when the same build fails a number of consecutive times.
@@ -15,35 +17,97 @@ The jenkins-job-notifier app checks the following metrics and raises alarms:
 Notifications are sent through a webhook.
 
 ## Installation and Usage
+
 - Clone the repository or download the source code from GitHub.
 - Make sure you have Python 3 installed on your system.
 - Install the required packages by running pip install -r requirements.txt in your terminal.
 - Create the .env file with the necessary parameters. [See Configuration below](#configuration).
 - Run the app using python app.py.
 - Alternatively, build the Docker image and run the Docker container with the environment variables loaded from the .env file:
-    ```
-    docker run --detach --volume $(pwd)/data:/app/data --env-file .env jenkins-job-notifier
-    ```
+  ```
+  docker run --detach --volume $(pwd)/data:/app/data --env-file .env jenkins-job-notifier
+  ```
 
 The app will run in the background and will continuously check the job status. Any errors will be displayed in the log.
 
+### Example: Running in Docker Swarm
+
+To run the jenkins-job-notifier in Docker Swarm using a prebuilt image from GitHub Container Registry, follow these steps:
+
+1. **Initialize Docker Swarm** (if not already initialized):
+
+   ```bash
+   docker swarm init
+   ```
+
+2. **Create a `docker-compose.yml`** file with the following contents:
+
+   ```yaml
+   version: "3.8"
+
+   services:
+   pr:
+     image: ghcr.io/zammitjohn/jenkins-job-notifier:latest
+     volumes:
+       - ./pr/data:/app/data
+     env_file:
+       - ./pr/.env
+     deploy:
+     restart_policy:
+       condition: on-failure
+       delay: 10s
+       max_attempts: 5
+       window: 60s
+
+   housekeeping:
+     image: ghcr.io/zammitjohn/jenkins-job-notifier:latest
+     volumes:
+       - ./housekeeping/data:/app/data
+     env_file:
+       - ./housekeeping/.env
+     deploy:
+     restart_policy:
+       condition: on-failure
+       delay: 10s
+       max_attempts: 5
+       window: 60s
+   ```
+
+3. **Deploy the stack**:
+
+   ```bash
+   docker stack deploy -c docker-compose.yml jenkins-job-notifier
+   ```
+
+4. **Check service status**:
+   ```bash
+   docker service ls
+   ```
+
+The container will now run under Docker Swarm with a restart policy that retries on failure after a 10-second delay, up to 5 times.
+
 ## Configuration
+
 In order to set up the environment variables needed for this project, you should create a .env file in the root directory of your project with the following variables:
 
 ### Jenkins configuration
+
 - `JENKINS_DOMAIN`: The domain name for your Jenkins server.
 - `JENKINS_JOB_NAME`: The name of the Jenkins job you want to monitor.
 - `JENKINS_USERNAME`: The username to use for authentication with your Jenkins server.
 - `JENKINS_TOKEN`: The API token to use for authentication with your Jenkins server.
 
 ### Teams notifications
+
 - `TEAMS_WEBHOOK_URL`: The URL for the Microsoft Teams webhook you want to use for notifications.
 
 ### Polling frequency
+
 - `BUILD_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for build status. Default: 5.
 - `JOB_POLL_FREQUENCY_SECONDS`: The number of seconds between each polling request for job status. Default: 5400 (1 hour), disable by setting to -1.
 
 ### Thresholds
+
 - `MAX_ABORTED_BUILDS`: The maximum number of builds that can be aborted within `JOB_POLL_FREQUENCY_SECONDS`. Default: 4.
 - `MAX_EXECUTED_BUILDS`: The maximum number of builds that can be executed within `JOB_POLL_FREQUENCY_SECONDS`. Default: 6.
 - `MAX_FAILED_BUILDS`: The maximum number of builds that can fail within `JOB_POLL_FREQUENCY_SECONDS`. Default: 3.
